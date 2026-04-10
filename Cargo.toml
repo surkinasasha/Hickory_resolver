@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 hickory-proto = "0.24"
 hickory-server = "0.24"
-hickory-resolver = { version = "0.24", features = ["tokio-runtime"] }
+hickory-resolver = { version = "0.24", features = ["tokio-runtime", "dnssec-ring"] }
 rocksdb = "0.22"
 bincode = "1"
 tokio = { version = "1", features = ["full", "net"] }

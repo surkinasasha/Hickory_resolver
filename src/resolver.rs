@@ -19,7 +19,13 @@ pub struct CachedResolver {
 impl CachedResolver {
     pub async fn new(cache_path: &str) -> Result<Self> {
         let cache = Arc::new(DnsCache::new(cache_path)?);
-        let resolver = TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
+
+        let mut opts = ResolverOpts::default();
+        opts.validate = true; // DNSSEC Валидация включена
+        
+        let config = ResolverConfig::google(); // Рекурсия через Google с DNSSEC
+        let resolver = TokioAsyncResolver::tokio(config, opts);
+
         Ok(Self {
             cache,
             inner: resolver,
@@ -32,12 +38,11 @@ impl CachedResolver {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let offline = *self.offline_mode.read();
 
-        // 1. Сначала ищем в базе (даже протухшее)
+        // 1. Сначала база
         if let Ok(Some(entry)) = self.cache.get_stale(&key) {
             let is_stale = entry.expires_at <= now;
             let ttl_left = entry.expires_at.saturating_sub(now);
 
-            // Если онлайн и пора обновить - запускаем фон
             if !offline && (is_stale || ttl_left < (entry.original_ttl as u64 / 3).max(30)) {
                 let resolver = self.inner.clone();
                 let cache = self.cache.clone();
@@ -57,7 +62,7 @@ impl CachedResolver {
             return Ok(Some(entry.data));
         }
 
-        // 2. Если в базе пусто и онлайн - идем в интернет
+        // 2. Интернет (если не Offline)
         if !offline {
             if let Ok(Some(wire_data)) = Self::do_recursive(&self.inner, name, qtype).await {
                 let ttl = if let Ok(m) = Message::from_vec(&wire_data) {
@@ -92,7 +97,10 @@ impl CachedResolver {
                 msg.emit(&mut enc)?;
                 Ok(Some(bytes))
             }
-            Err(_) => Ok(None),
+            Err(e) => {
+                tracing::error!("DNSSEC/Network error for {}: {}", name, e);
+                Ok(None)
+            }
         }
     }
 

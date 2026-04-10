@@ -12,7 +12,7 @@ use tokio::net::{TcpListener, UdpSocket};
 use axum::routing::post;
 use crate::resolver::CachedResolver;
 use crate::handler::BunkerHandler;
-use crate::api::{ApiState, set_mode, freeze_zone, stats};
+use crate::api::{ApiState, set_mode, freeze_zone, stats, add_record};
 
 #[tokio::main]
 async fn main() {
@@ -29,6 +29,8 @@ async fn main() {
 
     let handler_arc = Arc::new(handler.clone());
     let mut server = ServerFuture::new(handler);
+    
+    // Ставим порт 1053 (или 53, если есть права)
     let socket = UdpSocket::bind("0.0.0.0:1053").await.expect("Bind failed");
     server.register_socket(socket);
 
@@ -41,6 +43,7 @@ async fn main() {
         .route("/mode", post(set_mode))
         .route("/freeze", post(freeze_zone))
         .route("/stats", post(stats))
+        .route("/add_record", post(add_record)) // Новый роут
         .with_state(api_state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));

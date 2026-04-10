@@ -19,18 +19,13 @@ pub struct BunkerHandler {
 
 #[async_trait]
 impl RequestHandler for BunkerHandler {
-    async fn handle_request<R: ResponseHandler>(
-        &self,
-        request: &Request,
-        response_handle: R,
-    ) -> ResponseInfo {
+    async fn handle_request<R: ResponseHandler>(&self, request: &Request, response_handle: R) -> ResponseInfo {
         let query = request.request_info().query;
         let qname = query.name();
         let qtype = query.query_type();
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         let is_offline = *self.resolver.offline_mode.read();
 
-        // 1. Authoritative Zones (Freeze)
         let zone_found = {
             let zones = self.rocksdb_zones.read();
             zones.iter()
@@ -52,12 +47,11 @@ impl RequestHandler for BunkerHandler {
             }
         }
 
-        // 2. Cache / Internet
         let lookup_name = Name::from(qname.clone());
         match self.resolver.lookup(&lookup_name, qtype).await {
             Ok(Some(data)) => {
                 if let Ok(mut msg) = Message::from_vec(&data) {
-                    msg.set_authoritative(is_offline); // AA=true если в Бункере
+                    msg.set_authoritative(is_offline); 
                     let key = format!("{}:{}", qname, qtype).into_bytes();
                     if let Ok(Some(entry)) = self.resolver.cache.get_stale(&key) {
                         let rem_ttl = entry.expires_at.saturating_sub(now) as u32;
