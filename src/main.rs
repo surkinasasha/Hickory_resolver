@@ -29,10 +29,13 @@ async fn main() {
 
     let handler_arc = Arc::new(handler.clone());
     let mut server = ServerFuture::new(handler);
-    
-    // Ставим порт 1053 (или 53, если есть права)
-    let socket = UdpSocket::bind("0.0.0.0:1053").await.expect("Bind failed");
+   
+    let socket = UdpSocket::bind("0.0.0.0:0053")
+        .await
+        .expect("Could not bind to port 53. Try running with sudo.");
+
     server.register_socket(socket);
+ 
 
     tokio::spawn(async move {
         server.block_until_done().await.unwrap();
