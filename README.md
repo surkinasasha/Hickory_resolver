@@ -1,6 +1,9 @@
 Сборка и запуск 
-git clone 
+
+git clone https://github.com/surkinasasha/Hickory_resolver.git
+
 cd hickory_bunker
+
 cargo build --release
 
 sudo ./target/release/hickory_bunker
